@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     @property
     def llm_model(self) -> str:
-        return "llama3-8b-8192"
+        return "llama-3.3-70b-versatile"
 
     # ─── Database ────────────────────────────────────────────────────────
     postgres_user: str = "documind"
