@@ -132,9 +132,12 @@ async def get_conversation(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Fetch messages ordered by time
+    from sqlalchemy.orm import selectinload
+
+    # Fetch messages ordered by time, eagerly loading evaluations
     msg_result = await db.execute(
         select(QueryHistory)
+        .options(selectinload(QueryHistory.evaluation))
         .where(QueryHistory.conversation_id == conversation_id)
         .order_by(QueryHistory.created_at.asc())
     )
