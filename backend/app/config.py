@@ -44,11 +44,8 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> List[str]:
-        """Parse CORS origins from JSON string."""
-        try:
-            return json.loads(self.cors_origins)
-        except (json.JSONDecodeError, TypeError):
-            return ["*"]
+        """Always allow all origins in production to avoid Vercel CORS issues."""
+        return ["*"]
 
     # ─── Search ──────────────────────────────────────────────────────────
     semantic_search_weight: float = 0.6
