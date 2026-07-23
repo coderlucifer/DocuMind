@@ -145,7 +145,6 @@ async def stream_agent_pipeline(
     db: AsyncSession,
     user_id: str,
     conversation_id: uuid.UUID | None = None,
-    background_tasks: BackgroundTasks | None = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream the agent pipeline execution via SSE.
@@ -256,11 +255,7 @@ async def stream_agent_pipeline(
     await db.refresh(query_record)
     await db.commit()
 
-    contexts = [c.get("text_snippet", "") for c in state.citations]
-    if background_tasks:
-        background_tasks.add_task(run_eval_bg, query_record.id, query, state.answer, contexts, document_id)
-    else:
-        asyncio.create_task(run_eval_bg(query_record.id, query, state.answer, contexts, document_id))
+    # Background task is now handled by the router
 
     yield {
         "event": "complete",

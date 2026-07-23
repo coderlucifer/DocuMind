@@ -123,18 +123,28 @@ async def ask_question(
         # Return SSE streaming response
         async def event_generator():
             try:
+                final_query_id = uuid.uuid4()
+                final_answer = ""
+                final_citations = []
+                
                 async for event in stream_agent_pipeline(
                     query=request.query,
                     document_id=request.document_id,
                     db=db,
                     user_id=x_user_id,
                     conversation_id=conversation_id,
-                    background_tasks=background_tasks,
                 ):
                     # Inject conversation_id into the complete event
                     if event["event"] == "complete":
                         event["data"]["conversation_id"] = str(conversation_id)
+                        final_query_id = uuid.UUID(event["data"]["query_id"])
+                        final_answer = event["data"]["answer"]
+                        final_citations = event["data"].get("citations", [])
                     yield f"event: {event['event']}\ndata: {json.dumps(event['data'])}\n\n"
+                    
+                # Schedule evaluation in background
+                contexts = [c.get("text_snippet", "") for c in final_citations]
+                background_tasks.add_task(run_eval_bg, final_query_id, request.query, final_answer, contexts, request.document_id)
             except Exception as e:
                 logger.error("SSE stream error", error=str(e))
                 error_data = {"detail": str(e)}
@@ -148,6 +158,7 @@ async def ask_question(
                 "Connection": "keep-alive",
                 "X-Accel-Buffering": "no",
             },
+            background=background_tasks
         )
 
     # Non-streaming response
