@@ -137,12 +137,15 @@ async def run_agent_pipeline(
     return state
 
 
+from fastapi import BackgroundTasks
+
 async def stream_agent_pipeline(
     query: str,
     document_id: uuid.UUID,
     db: AsyncSession,
     user_id: str,
     conversation_id: uuid.UUID | None = None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream the agent pipeline execution via SSE.
@@ -254,7 +257,10 @@ async def stream_agent_pipeline(
     await db.commit()
 
     contexts = [c.get("text_snippet", "") for c in state.citations]
-    asyncio.create_task(run_eval_bg(query_record.id, query, state.answer, contexts, document_id))
+    if background_tasks:
+        background_tasks.add_task(run_eval_bg, query_record.id, query, state.answer, contexts, document_id)
+    else:
+        asyncio.create_task(run_eval_bg(query_record.id, query, state.answer, contexts, document_id))
 
     yield {
         "event": "complete",

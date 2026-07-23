@@ -6,7 +6,7 @@
 import json
 import uuid
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Document, DocumentStatus, Conversation
 from app.schemas import QueryRequest, QueryResponse
-from app.agent.graph import run_agent_pipeline, stream_agent_pipeline
+from app.agent.graph import run_agent_pipeline, stream_agent_pipeline, run_eval_bg
 from app.services.rate_limiter import check_rate_limit, increment_usage
 
 logger = structlog.get_logger(__name__)
@@ -79,6 +79,7 @@ async def _resolve_conversation(
 @router.post("", response_model=QueryResponse)
 async def ask_question(
     request: QueryRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     x_user_id: str = Header("anonymous"),
 ):
@@ -128,6 +129,7 @@ async def ask_question(
                     db=db,
                     user_id=x_user_id,
                     conversation_id=conversation_id,
+                    background_tasks=background_tasks,
                 ):
                     # Inject conversation_id into the complete event
                     if event["event"] == "complete":
@@ -156,6 +158,10 @@ async def ask_question(
         user_id=x_user_id,
         conversation_id=conversation_id,
     )
+    
+    # Run evaluation in background for non-streaming response as well
+    contexts = [c.get("text_snippet", "") for c in state.citations]
+    background_tasks.add_task(run_eval_bg, state.agent_steps[-1].get("query_id") if state.agent_steps else uuid.uuid4(), request.query, state.answer, contexts, request.document_id)
 
     return QueryResponse(
         query_id=state.agent_steps[-1].get("query_id", uuid.uuid4()) if state.agent_steps else uuid.uuid4(),
