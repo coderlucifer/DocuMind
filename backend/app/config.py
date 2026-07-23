@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     @property
     def llm_model(self) -> str:
-        return "gemini-1.5-flash"
+        return "gemini-3.6-flash"
 
     # ─── Database ────────────────────────────────────────────────────────
     postgres_user: str = "documind"
