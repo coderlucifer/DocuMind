@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
     backend_reload: bool = True
-    cors_origins: str = '["http://localhost:3000","http://localhost:8000"]'
+    cors_origins: str = '["*"]'
 
     @property
     def cors_origin_list(self) -> List[str]:
@@ -48,7 +48,7 @@ class Settings(BaseSettings):
         try:
             return json.loads(self.cors_origins)
         except (json.JSONDecodeError, TypeError):
-            return ["http://localhost:3000", "http://localhost:8000"]
+            return ["*"]
 
     # ─── Search ──────────────────────────────────────────────────────────
     semantic_search_weight: float = 0.6
