@@ -5,7 +5,7 @@
 
 import json
 import structlog
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
@@ -14,9 +14,9 @@ from app.agent.state import AgentState
 logger = structlog.get_logger(__name__)
 
 # LLM for planning
-planner_llm = ChatGroq(
+planner_llm = ChatGoogleGenerativeAI(
     model=settings.llm_model,
-    api_key=settings.groq_api_key,
+    google_api_key=settings.google_api_key,
     temperature=0,
 )
 
