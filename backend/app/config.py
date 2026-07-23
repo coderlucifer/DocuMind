@@ -24,7 +24,10 @@ class Settings(BaseSettings):
 
     # ─── Groq (Free Tier LLM) ──────────────────────────────────────────
     groq_api_key: str = Field(default="", description="Groq API key")
-    llm_model: str = "llama3-8b-8192"
+    
+    @property
+    def llm_model(self) -> str:
+        return "llama3-8b-8192"
 
     # ─── Database ────────────────────────────────────────────────────────
     postgres_user: str = "documind"
