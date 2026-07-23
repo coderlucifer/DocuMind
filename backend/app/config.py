@@ -19,9 +19,12 @@ class Settings(BaseSettings):
 
     # ─── Google Gemini (Free Tier) ─────────────────────────────────────
     google_api_key: str = Field(..., description="Google Gemini API key")
-    llm_model: str = "gemini-3.5-flash"
     embedding_model: str = "models/text-embedding-004"
     embedding_dimensions: int = 768
+
+    # ─── Groq (Free Tier LLM) ──────────────────────────────────────────
+    groq_api_key: str = Field(default="", description="Groq API key")
+    llm_model: str = "llama3-8b-8192"
 
     # ─── Database ────────────────────────────────────────────────────────
     postgres_user: str = "documind"

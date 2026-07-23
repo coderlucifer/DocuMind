@@ -5,7 +5,7 @@
 
 import json
 import structlog
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.config import settings
@@ -14,11 +14,11 @@ from app.agent.state import AgentState
 logger = structlog.get_logger(__name__)
 
 # LLM for self-critique
-critic_llm = ChatGoogleGenerativeAI(
+critic_llm = ChatGroq(
     model=settings.llm_model,
-    google_api_key=settings.google_api_key,
+    api_key=settings.groq_api_key,
     temperature=0,
-    max_output_tokens=800,
+    max_tokens=800,
 )
 
 CRITIC_SYSTEM_PROMPT = """You are a strict answer quality evaluator for a RAG (Retrieval-Augmented Generation) system.
