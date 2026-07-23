@@ -219,11 +219,15 @@ async def stream_agent_pipeline(
         state.answer = ""
         # Stream the LLM response chunk by chunk
         async for chunk in generator_llm.astream(messages):
-            if chunk.content:
-                state.answer += chunk.content
+            content = chunk.content
+            if isinstance(content, list):
+                content = " ".join([str(c.get("text", "")) for c in content if isinstance(c, dict) and "text" in c])
+            
+            if content:
+                state.answer += str(content)
                 yield {
                     "event": "token",
-                    "data": {"token": chunk.content}
+                    "data": {"token": str(content)}
                 }
                 
     state.confidence_score = 1.0 # Bypassing critic
