@@ -85,6 +85,11 @@ export function useSSE() {
               case "generated":
                 newState.currentPhase = "Answer generated";
                 break;
+              case "token":
+                newState.currentPhase = "Synthesizing answer...";
+                // Append token to the answer
+                newState.answer = (newState.answer || "") + String(event.data.token || "");
+                break;
               case "critiquing":
                 newState.currentPhase = "Evaluating quality...";
                 break;
@@ -97,7 +102,10 @@ export function useSSE() {
               case "complete":
                 newState.isStreaming = false;
                 newState.currentPhase = "Complete";
-                newState.answer = event.data.answer as string;
+                // Only set answer if it wasn't streamed, or if we want to ensure final cleanup
+                if (event.data.answer) {
+                  newState.answer = event.data.answer as string;
+                }
                 newState.citations = (event.data.citations as Citation[]) || [];
                 newState.confidence = event.data.confidence_score as number;
                 newState.latencyMs = event.data.latency_ms as number;

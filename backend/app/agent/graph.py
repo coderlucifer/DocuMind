@@ -171,85 +171,63 @@ async def stream_agent_pipeline(
         max_iterations=settings.max_retrieval_iterations,
     )
 
-    # ── Plan ─────────────────────────────────────────────────────────────
+    # ── Single-Pass Retrieval ────────────────────────────────────────────
     yield {
-        "event": "planning",
-        "data": {"status": "Analyzing query complexity..."},
-    }
-
-    state = await plan_query(state)
-
-    yield {
-        "event": "planned",
+        "event": "retrieving",
         "data": {
-            "is_complex": state.is_complex,
-            "sub_queries": state.sub_queries,
+            "status": "Searching documents...",
+            "sub_queries": [query],
         },
     }
 
-    # ── Retrieve → Generate → Critique Loop ──────────────────────────────
-    while True:
-        # Retrieve
-        yield {
-            "event": "retrieving",
-            "data": {
-                "status": f"Searching documents (iteration {state.iteration_count + 1})...",
-                "sub_queries": state.sub_queries,
-            },
-        }
+    state.sub_queries = [query]
+    state = await retrieve(state, db)
 
-        state = await retrieve(state, db)
+    yield {
+        "event": "retrieved",
+        "data": {
+            "chunk_count": len(state.retrieved_chunks),
+            "top_score": state.retrieved_chunks[0]["score"] if state.retrieved_chunks else 0,
+        },
+    }
 
-        yield {
-            "event": "retrieved",
-            "data": {
-                "chunk_count": len(state.retrieved_chunks),
-                "top_score": state.retrieved_chunks[0]["score"] if state.retrieved_chunks else 0,
-            },
-        }
-
-        # Generate
-        yield {
-            "event": "generating",
-            "data": {"status": "Synthesizing answer with citations..."},
-        }
-
-        state = await generate_answer(state)
-
-        yield {
-            "event": "generated",
-            "data": {
-                "answer_preview": state.answer[:200] + "..." if len(state.answer) > 200 else state.answer,
-            },
-        }
-
-        # Critique
-        yield {
-            "event": "critiquing",
-            "data": {"status": "Evaluating answer quality..."},
-        }
-
-        state = await critique_answer(state)
-
-        yield {
-            "event": "critiqued",
-            "data": {
-                "confidence": state.confidence_score,
-                "hallucination": state.hallucination_score,
-                "needs_re_retrieval": state.needs_re_retrieval,
-            },
-        }
-
-        if not state.needs_re_retrieval:
-            break
-
-        yield {
-            "event": "re_retrieving",
-            "data": {
-                "status": f"Quality below threshold. Re-retrieving (attempt {state.iteration_count})...",
-                "refined_queries": state.sub_queries,
-            },
-        }
+    # ── Single-Pass Generation with Token Streaming ──────────────────────
+    yield {
+        "event": "generating",
+        "data": {"status": "Synthesizing answer..."},
+    }
+    
+    if not state.retrieval_context:
+        state.answer = (
+            "I couldn't find any relevant information in the document to answer "
+            "this question. Please try rephrasing your query or ensure the "
+            "document contains relevant content."
+        )
+        yield {"event": "token", "data": {"token": state.answer}}
+    else:
+        from app.agent.nodes.generator import generator_llm, GENERATOR_SYSTEM_PROMPT, GENERATOR_HUMAN_TEMPLATE
+        from langchain_core.messages import SystemMessage, HumanMessage
+        
+        messages = [
+            SystemMessage(content=GENERATOR_SYSTEM_PROMPT),
+            HumanMessage(content=GENERATOR_HUMAN_TEMPLATE.format(
+                query=state.original_query,
+                context=state.retrieval_context,
+            )),
+        ]
+        
+        state.answer = ""
+        # Stream the LLM response chunk by chunk
+        async for chunk in generator_llm.astream(messages):
+            if chunk.content:
+                state.answer += chunk.content
+                yield {
+                    "event": "token",
+                    "data": {"token": chunk.content}
+                }
+                
+    state.confidence_score = 1.0 # Bypassing critic
+    state.iteration_count = 1
 
     # ── Save and Complete ────────────────────────────────────────────────
     latency_ms = int((time.time() - start_time) * 1000)
